@@ -1,14 +1,41 @@
 # openclaw-repo
 
-A polished browser-based Pong game.
+A tiny static arcade with two browser-playable experiences:
 
-## Features
+- **Neon Pong** — a polished browser-based Pong game
+- **Dungeon Bot** — a Telegram-style text adventure game
 
+## Included apps
+
+### 1) OpenClaw Arcade launcher
+Open `index.html` to get a simple landing page with links to both games.
+
+### 2) Neon Pong
+Features:
 - Neon arcade styling
 - Solo mode against a simple AI opponent
 - Two-player local mode
 - Scoreboard with win condition (first to 7)
 - Pause and instant restart controls
+
+Controls:
+- `W` / `S` — left paddle
+- `↑` / `↓` — right paddle
+- `A` — toggle AI / two-player mode
+- `P` — pause
+- `Space` — start or restart the match
+
+### 3) Dungeon Bot
+A text-based adventure presented like a Telegram bot chat.
+
+Commands:
+- `/start` — reset the run
+- `/explore` — search for enemies, treasure, or events
+- `/fight` — attack an active enemy encounter
+- `/rest` — recover HP when safe
+- `/inventory` — show gear and resources
+- `/drink` — use a healing potion
+- `/help` — show the command list
 
 ## Run
 
@@ -26,10 +53,8 @@ Then visit:
 http://localhost:8000
 ```
 
-## Controls
+## Files
 
-- `W` / `S` — left paddle
-- `↑` / `↓` — right paddle
-- `A` — toggle AI / two-player mode
-- `P` — pause
-- `Space` — start or restart the match
+- `index.html` — landing page / launcher
+- `pong.html` — Pong game
+- `telegram-quest.html` — Telegram-style text adventure
