@@ -1,0 +1,530 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Neon Pong</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #020617;
+      --panel: #0f172a;
+      --line: #1e293b;
+      --text: #e2e8f0;
+      --muted: #94a3b8;
+      --glow: #22d3ee;
+      --accent: #a78bfa;
+      --ball: #f8fafc;
+      --left: #22d3ee;
+      --right: #a78bfa;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      background:
+        radial-gradient(circle at top, rgba(34, 211, 238, 0.16), transparent 30%),
+        radial-gradient(circle at bottom, rgba(167, 139, 250, 0.18), transparent 35%),
+        var(--bg);
+      color: var(--text);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      padding: 24px;
+    }
+
+    .wrap {
+      width: min(100%, 980px);
+      text-align: center;
+    }
+
+    .title {
+      margin: 0 0 8px;
+      font-size: clamp(28px, 5vw, 52px);
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      text-shadow: 0 0 24px rgba(34, 211, 238, 0.35);
+    }
+
+    .subtitle {
+      margin: 0 0 18px;
+      color: var(--muted);
+      font-size: 14px;
+      letter-spacing: 0.04em;
+    }
+
+    .game-shell {
+      position: relative;
+      border: 1px solid rgba(148, 163, 184, 0.22);
+      border-radius: 20px;
+      padding: 18px;
+      background: rgba(15, 23, 42, 0.72);
+      box-shadow:
+        0 18px 60px rgba(0, 0, 0, 0.45),
+        inset 0 0 0 1px rgba(255, 255, 255, 0.03);
+      backdrop-filter: blur(8px);
+    }
+
+    canvas {
+      width: 100%;
+      height: auto;
+      display: block;
+      background:
+        linear-gradient(180deg, rgba(15, 23, 42, 0.95), rgba(2, 6, 23, 0.98));
+      border-radius: 14px;
+      border: 1px solid rgba(148, 163, 184, 0.16);
+      box-shadow: inset 0 0 40px rgba(15, 23, 42, 0.9);
+    }
+
+    .hud {
+      display: flex;
+      gap: 12px;
+      justify-content: space-between;
+      align-items: center;
+      margin-top: 14px;
+      flex-wrap: wrap;
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    .pill-row {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+
+    .pill {
+      padding: 8px 12px;
+      border-radius: 999px;
+      background: rgba(30, 41, 59, 0.9);
+      border: 1px solid rgba(148, 163, 184, 0.14);
+    }
+
+    .overlay {
+      position: absolute;
+      inset: 18px;
+      display: grid;
+      place-items: center;
+      pointer-events: none;
+    }
+
+    .card {
+      max-width: 440px;
+      padding: 24px 22px;
+      border-radius: 18px;
+      background: rgba(2, 6, 23, 0.82);
+      border: 1px solid rgba(148, 163, 184, 0.18);
+      box-shadow: 0 16px 40px rgba(0, 0, 0, 0.34);
+      backdrop-filter: blur(8px);
+    }
+
+    .card h2 {
+      margin: 0 0 12px;
+      font-size: 28px;
+    }
+
+    .card p {
+      margin: 8px 0;
+      color: var(--muted);
+      line-height: 1.5;
+      font-size: 14px;
+    }
+
+    .kbd {
+      display: inline-block;
+      min-width: 28px;
+      padding: 4px 8px;
+      border-radius: 8px;
+      background: rgba(30, 41, 59, 0.95);
+      border: 1px solid rgba(148, 163, 184, 0.18);
+      color: var(--text);
+      font-weight: 700;
+      font-size: 12px;
+      letter-spacing: 0.02em;
+    }
+
+    @media (max-width: 700px) {
+      body {
+        padding: 12px;
+      }
+
+      .game-shell {
+        padding: 12px;
+      }
+
+      .overlay {
+        inset: 12px;
+      }
+
+      .card {
+        padding: 18px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="wrap">
+    <h1 class="title">Neon Pong</h1>
+    <p class="subtitle">Arcade-style Pong with solo and versus modes</p>
+
+    <section class="game-shell">
+      <canvas id="game" width="960" height="540" aria-label="Pong game canvas"></canvas>
+      <div class="overlay" id="overlay"></div>
+
+      <div class="hud">
+        <div class="pill-row">
+          <div class="pill">Left paddle: <strong>W</strong> / <strong>S</strong></div>
+          <div class="pill">Right paddle: <strong>↑</strong> / <strong>↓</strong></div>
+        </div>
+        <div class="pill-row">
+          <div class="pill"><strong>Space</strong> restart</div>
+          <div class="pill"><strong>A</strong> toggle AI</div>
+          <div class="pill"><strong>P</strong> pause</div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    const canvas = document.getElementById('game');
+    const ctx = canvas.getContext('2d');
+    const overlay = document.getElementById('overlay');
+
+    const WIN_SCORE = 7;
+    const paddleHeight = 110;
+
+    const state = {
+      keys: {},
+      leftScore: 0,
+      rightScore: 0,
+      aiEnabled: true,
+      paused: true,
+      winner: null,
+      flashTimer: 0,
+      left: {
+        x: 28,
+        y: canvas.height / 2 - paddleHeight / 2,
+        w: 14,
+        h: paddleHeight,
+        speed: 8,
+        color: '#22d3ee'
+      },
+      right: {
+        x: canvas.width - 42,
+        y: canvas.height / 2 - paddleHeight / 2,
+        w: 14,
+        h: paddleHeight,
+        speed: 8,
+        color: '#a78bfa'
+      },
+      ball: {
+        x: canvas.width / 2,
+        y: canvas.height / 2,
+        r: 10,
+        vx: 0,
+        vy: 0,
+        speed: 6,
+        maxSpeed: 13
+      }
+    };
+
+    function clamp(value, min, max) {
+      return Math.max(min, Math.min(max, value));
+    }
+
+    function resetPaddles() {
+      state.left.y = canvas.height / 2 - state.left.h / 2;
+      state.right.y = canvas.height / 2 - state.right.h / 2;
+    }
+
+    function resetBall(direction = Math.random() > 0.5 ? 1 : -1) {
+      state.ball.x = canvas.width / 2;
+      state.ball.y = canvas.height / 2;
+      state.ball.speed = 6;
+
+      const angle = (Math.random() * 1.2 - 0.6);
+      state.ball.vx = Math.cos(angle) * state.ball.speed * direction;
+      state.ball.vy = Math.sin(angle) * state.ball.speed;
+
+      if (Math.abs(state.ball.vy) < 1.2) {
+        state.ball.vy = 1.2 * (Math.random() > 0.5 ? 1 : -1);
+      }
+    }
+
+    function startRound(direction) {
+      state.paused = false;
+      state.winner = null;
+      resetBall(direction);
+      updateOverlay();
+    }
+
+    function restartGame() {
+      state.leftScore = 0;
+      state.rightScore = 0;
+      state.winner = null;
+      state.flashTimer = 0;
+      resetPaddles();
+      startRound(Math.random() > 0.5 ? 1 : -1);
+    }
+
+    function setRoundPause(message) {
+      state.paused = true;
+      updateOverlay(message);
+    }
+
+    function scorePoint(side) {
+      if (side === 'left') state.leftScore += 1;
+      if (side === 'right') state.rightScore += 1;
+      state.flashTimer = 14;
+
+      if (state.leftScore >= WIN_SCORE || state.rightScore >= WIN_SCORE) {
+        state.winner = state.leftScore >= WIN_SCORE ? 'Left Player' : (state.aiEnabled ? 'Computer' : 'Right Player');
+        state.paused = true;
+        updateOverlay(`${state.winner} wins!`);
+        return;
+      }
+
+      setRoundPause(side === 'left' ? 'Left player scores!' : (state.aiEnabled ? 'Computer scores!' : 'Right player scores!'));
+      window.setTimeout(() => {
+        if (!state.winner) startRound(side === 'left' ? -1 : 1);
+      }, 850);
+    }
+
+    function intersects(ball, paddle) {
+      return (
+        ball.x - ball.r <= paddle.x + paddle.w &&
+        ball.x + ball.r >= paddle.x &&
+        ball.y - ball.r <= paddle.y + paddle.h &&
+        ball.y + ball.r >= paddle.y
+      );
+    }
+
+    function reflectFromPaddle(paddle, direction) {
+      const relativeIntersect = (state.ball.y - (paddle.y + paddle.h / 2)) / (paddle.h / 2);
+      const bounceAngle = relativeIntersect * (Math.PI / 3.2);
+      state.ball.speed = clamp(state.ball.speed + 0.45, 6, state.ball.maxSpeed);
+      state.ball.vx = Math.cos(bounceAngle) * state.ball.speed * direction;
+      state.ball.vy = Math.sin(bounceAngle) * state.ball.speed;
+    }
+
+    function movePlayerPaddles() {
+      if (state.keys['w']) state.left.y -= state.left.speed;
+      if (state.keys['s']) state.left.y += state.left.speed;
+
+      if (!state.aiEnabled) {
+        if (state.keys['ArrowUp']) state.right.y -= state.right.speed;
+        if (state.keys['ArrowDown']) state.right.y += state.right.speed;
+      }
+
+      state.left.y = clamp(state.left.y, 0, canvas.height - state.left.h);
+      state.right.y = clamp(state.right.y, 0, canvas.height - state.right.h);
+    }
+
+    function moveAiPaddle() {
+      if (!state.aiEnabled || state.winner) return;
+
+      const target = state.ball.y - state.right.h / 2;
+      const distance = target - state.right.y;
+      const reaction = clamp(distance * 0.11, -state.right.speed * 0.9, state.right.speed * 0.9);
+      state.right.y += reaction;
+      state.right.y = clamp(state.right.y, 0, canvas.height - state.right.h);
+    }
+
+    function updateBall() {
+      if (state.paused || state.winner) return;
+
+      state.ball.x += state.ball.vx;
+      state.ball.y += state.ball.vy;
+
+      if (state.ball.y - state.ball.r <= 0) {
+        state.ball.y = state.ball.r;
+        state.ball.vy *= -1;
+      }
+
+      if (state.ball.y + state.ball.r >= canvas.height) {
+        state.ball.y = canvas.height - state.ball.r;
+        state.ball.vy *= -1;
+      }
+
+      if (intersects(state.ball, state.left) && state.ball.vx < 0) {
+        state.ball.x = state.left.x + state.left.w + state.ball.r;
+        reflectFromPaddle(state.left, 1);
+      }
+
+      if (intersects(state.ball, state.right) && state.ball.vx > 0) {
+        state.ball.x = state.right.x - state.ball.r;
+        reflectFromPaddle(state.right, -1);
+      }
+
+      if (state.ball.x + state.ball.r < 0) scorePoint('right');
+      if (state.ball.x - state.ball.r > canvas.width) scorePoint('left');
+    }
+
+    function drawBackground() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.fillStyle = '#020617';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      const glow = ctx.createRadialGradient(canvas.width / 2, canvas.height / 2, 60, canvas.width / 2, canvas.height / 2, canvas.width / 1.6);
+      glow.addColorStop(0, 'rgba(34, 211, 238, 0.06)');
+      glow.addColorStop(1, 'rgba(2, 6, 23, 0)');
+      ctx.fillStyle = glow;
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      ctx.strokeStyle = 'rgba(148, 163, 184, 0.18)';
+      ctx.lineWidth = 4;
+      for (let y = 14; y < canvas.height; y += 34) {
+        ctx.beginPath();
+        ctx.moveTo(canvas.width / 2, y);
+        ctx.lineTo(canvas.width / 2, y + 18);
+        ctx.stroke();
+      }
+    }
+
+    function drawScores() {
+      ctx.save();
+      ctx.font = '700 64px Inter, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillStyle = 'rgba(226, 232, 240, 0.9)';
+      ctx.fillText(state.leftScore, canvas.width / 2 - 90, 78);
+      ctx.fillText(state.rightScore, canvas.width / 2 + 90, 78);
+
+      ctx.font = '600 18px Inter, sans-serif';
+      ctx.fillStyle = 'rgba(148, 163, 184, 0.95)';
+      ctx.fillText(`First to ${WIN_SCORE}`, canvas.width / 2, 44);
+      ctx.restore();
+    }
+
+    function drawPaddle(paddle) {
+      ctx.save();
+      ctx.fillStyle = paddle.color;
+      ctx.shadowColor = paddle.color;
+      ctx.shadowBlur = 18;
+      ctx.fillRect(paddle.x, paddle.y, paddle.w, paddle.h);
+      ctx.restore();
+    }
+
+    function drawBall() {
+      ctx.save();
+      ctx.fillStyle = '#f8fafc';
+      ctx.shadowColor = '#f8fafc';
+      ctx.shadowBlur = 18;
+      ctx.beginPath();
+      ctx.arc(state.ball.x, state.ball.y, state.ball.r, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    }
+
+    function drawStatusLine() {
+      ctx.save();
+      ctx.font = '600 18px Inter, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillStyle = 'rgba(148, 163, 184, 0.95)';
+      const mode = state.aiEnabled ? 'Mode: Solo vs Computer' : 'Mode: Two Player';
+      const pause = state.paused && !state.winner ? ' • Paused' : '';
+      ctx.fillText(`${mode}${pause}`, canvas.width / 2, canvas.height - 20);
+      ctx.restore();
+    }
+
+    function drawFlash() {
+      if (state.flashTimer <= 0) return;
+      ctx.save();
+      ctx.fillStyle = `rgba(255,255,255,${state.flashTimer / 90})`;
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.restore();
+      state.flashTimer -= 1;
+    }
+
+    function draw() {
+      drawBackground();
+      drawScores();
+      drawPaddle(state.left);
+      drawPaddle(state.right);
+      drawBall();
+      drawStatusLine();
+      drawFlash();
+    }
+
+    function overlayMarkup(title, lines) {
+      return `
+        <div class="card">
+          <h2>${title}</h2>
+          ${lines.map((line) => `<p>${line}</p>`).join('')}
+        </div>
+      `;
+    }
+
+    function updateOverlay(message) {
+      if (state.winner) {
+        overlay.innerHTML = overlayMarkup(message || `${state.winner} wins!`, [
+          `Press <span class="kbd">Space</span> to restart a fresh match.`,
+          `Press <span class="kbd">A</span> to switch between solo and two-player.`
+        ]);
+        return;
+      }
+
+      if (state.paused) {
+        overlay.innerHTML = overlayMarkup(message || 'Press Space to start', [
+          `Left paddle: <span class="kbd">W</span> / <span class="kbd">S</span>`,
+          `Right paddle: <span class="kbd">↑</span> / <span class="kbd">↓</span>`,
+          `Press <span class="kbd">A</span> to ${state.aiEnabled ? 'turn off' : 'turn on'} AI opponent.`
+        ]);
+        return;
+      }
+
+      overlay.innerHTML = '';
+    }
+
+    function tick() {
+      movePlayerPaddles();
+      moveAiPaddle();
+      updateBall();
+      draw();
+      requestAnimationFrame(tick);
+    }
+
+    window.addEventListener('keydown', (event) => {
+      const key = event.key;
+      state.keys[key] = true;
+
+      if (['ArrowUp', 'ArrowDown', ' '].includes(key)) {
+        event.preventDefault();
+      }
+
+      if (key === ' ') {
+        restartGame();
+      }
+
+      if (key === 'p' || key === 'P') {
+        if (!state.winner) {
+          state.paused = !state.paused;
+          updateOverlay(state.paused ? 'Paused' : '');
+        }
+      }
+
+      if (key === 'a' || key === 'A') {
+        state.aiEnabled = !state.aiEnabled;
+        resetPaddles();
+        setRoundPause(state.aiEnabled ? 'Solo mode enabled' : 'Two-player mode enabled');
+        window.setTimeout(() => {
+          if (state.paused && !state.winner) updateOverlay('Press Space to serve');
+        }, 350);
+      }
+    });
+
+    window.addEventListener('keyup', (event) => {
+      state.keys[event.key] = false;
+    });
+
+    resetPaddles();
+    updateOverlay();
+    draw();
+    tick();
+  </script>
+</body>
+</html>
