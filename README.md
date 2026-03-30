@@ -17,6 +17,7 @@ Features:
 - Two-player local mode
 - Scoreboard with win condition (first to 7)
 - Pause and instant restart controls
+- Local browser persistence for scoreboard state and match stats
 
 Controls:
 - `W` / `S` — left paddle
@@ -27,6 +28,10 @@ Controls:
 
 ### 3) Dungeon Bot
 A text-based adventure presented like a Telegram bot chat.
+
+Features:
+- Local browser save and restore for the current run
+- Chat history persists across refreshes
 
 Commands:
 - `/start` — reset the run
@@ -58,3 +63,10 @@ http://localhost:8000
 - `index.html` — landing page / launcher
 - `pong.html` — Pong game
 - `telegram-quest.html` — Telegram-style text adventure
+
+## Persistence
+
+Both games now store progress in browser `localStorage`:
+
+- `pong.html` remembers the current scoreboard, selected mode, and browser-local match stats
+- `telegram-quest.html` restores the current dungeon run and chat history after a refresh

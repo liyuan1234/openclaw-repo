@@ -343,6 +343,7 @@
     const goldEl = document.getElementById('gold');
     const floorEl = document.getElementById('floor');
     const potionsEl = document.getElementById('potions');
+    const QUEST_STORAGE_KEY = 'openclaw-arcade-dungeon-bot';
 
     const state = {
       hp: 10,
@@ -354,6 +355,7 @@
       pendingEnemy: null,
       alive: true
     };
+    const history = [];
 
     const encounters = [
       { type: 'enemy', name: 'Basement Rat', hp: 3, damage: [1, 2], gold: [1, 3], text: 'A basement rat bares its teeth from behind a cracked crate.' },
@@ -369,6 +371,7 @@
     }
 
     function addMessage(who, text) {
+      history.push({ who, text });
       const row = document.createElement('div');
       row.className = `row ${who}`;
       const bubble = document.createElement('div');
@@ -377,6 +380,7 @@
       row.appendChild(bubble);
       messagesEl.appendChild(row);
       messagesEl.scrollTop = messagesEl.scrollHeight;
+      persistState();
     }
 
     function renderState() {
@@ -391,6 +395,42 @@
         pill.textContent = item;
         inventoryEl.appendChild(pill);
       });
+      persistState();
+    }
+
+    function persistState() {
+      localStorage.setItem(QUEST_STORAGE_KEY, JSON.stringify({ state, history }));
+    }
+
+    function renderHistory() {
+      messagesEl.innerHTML = '';
+      history.forEach(({ who, text }) => {
+        const row = document.createElement('div');
+        row.className = `row ${who}`;
+        const bubble = document.createElement('div');
+        bubble.className = 'bubble';
+        bubble.textContent = text;
+        row.appendChild(bubble);
+        messagesEl.appendChild(row);
+      });
+      messagesEl.scrollTop = messagesEl.scrollHeight;
+    }
+
+    function loadPersistedState() {
+      const saved = localStorage.getItem(QUEST_STORAGE_KEY);
+      if (!saved) return false;
+      try {
+        const parsed = JSON.parse(saved);
+        if (!parsed.state || !Array.isArray(parsed.history)) return false;
+        Object.assign(state, parsed.state);
+        history.splice(0, history.length, ...parsed.history);
+        renderHistory();
+        renderState();
+        return true;
+      } catch (_error) {
+        localStorage.removeItem(QUEST_STORAGE_KEY);
+        return false;
+      }
     }
 
     function resetGame() {
@@ -402,6 +442,7 @@
       state.inventory = ['Rusty Sword'];
       state.pendingEnemy = null;
       state.alive = true;
+      history.splice(0, history.length);
       messagesEl.innerHTML = '';
       addMessage('bot', 'Welcome to Dungeon Bot. You descend into the ruins beneath the city.\n\nUse /explore to search, /fight when danger appears, /rest to recover, and /drink to use a potion.');
       renderState();
@@ -594,7 +635,11 @@
       });
     });
 
-    resetGame();
+    if (!loadPersistedState()) {
+      resetGame();
+    } else {
+      addMessage('bot', 'Run restored from local save. Use /start if you want a fresh descent.');
+    }
   </script>
 </body>
 </html>

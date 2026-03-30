@@ -210,6 +210,7 @@
     const canvas = document.getElementById('game');
     const ctx = canvas.getContext('2d');
     const overlay = document.getElementById('overlay');
+    const PONG_STORAGE_KEY = 'openclaw-arcade-pong';
 
     const WIN_SCORE = 7;
     const paddleHeight = 110;
@@ -222,6 +223,12 @@
       paused: true,
       winner: null,
       flashTimer: 0,
+      stats: {
+        matchesPlayed: 0,
+        leftWins: 0,
+        rightWins: 0,
+        aiWins: 0
+      },
       left: {
         x: 28,
         y: canvas.height / 2 - paddleHeight / 2,
@@ -253,6 +260,37 @@
       return Math.max(min, Math.min(max, value));
     }
 
+    function currentModeLabel() {
+      return state.aiEnabled ? 'Solo vs Computer' : 'Two Player';
+    }
+
+    function persistState() {
+      localStorage.setItem(PONG_STORAGE_KEY, JSON.stringify({
+        leftScore: state.leftScore,
+        rightScore: state.rightScore,
+        aiEnabled: state.aiEnabled,
+        paused: state.paused,
+        winner: state.winner,
+        stats: state.stats
+      }));
+    }
+
+    function loadPersistedState() {
+      const saved = localStorage.getItem(PONG_STORAGE_KEY);
+      if (!saved) return;
+      try {
+        const parsed = JSON.parse(saved);
+        state.leftScore = parsed.leftScore ?? state.leftScore;
+        state.rightScore = parsed.rightScore ?? state.rightScore;
+        state.aiEnabled = parsed.aiEnabled ?? state.aiEnabled;
+        state.paused = parsed.paused ?? state.paused;
+        state.winner = parsed.winner ?? state.winner;
+        state.stats = { ...state.stats, ...(parsed.stats || {}) };
+      } catch (_error) {
+        localStorage.removeItem(PONG_STORAGE_KEY);
+      }
+    }
+
     function resetPaddles() {
       state.left.y = canvas.height / 2 - state.left.h / 2;
       state.right.y = canvas.height / 2 - state.right.h / 2;
@@ -277,6 +315,7 @@
       state.winner = null;
       resetBall(direction);
       updateOverlay();
+      persistState();
     }
 
     function restartGame() {
@@ -286,11 +325,13 @@
       state.flashTimer = 0;
       resetPaddles();
       startRound(Math.random() > 0.5 ? 1 : -1);
+      persistState();
     }
 
     function setRoundPause(message) {
       state.paused = true;
       updateOverlay(message);
+      persistState();
     }
 
     function scorePoint(side) {
@@ -300,8 +341,13 @@
 
       if (state.leftScore >= WIN_SCORE || state.rightScore >= WIN_SCORE) {
         state.winner = state.leftScore >= WIN_SCORE ? 'Left Player' : (state.aiEnabled ? 'Computer' : 'Right Player');
+        state.stats.matchesPlayed += 1;
+        if (state.leftScore >= WIN_SCORE) state.stats.leftWins += 1;
+        if (state.rightScore >= WIN_SCORE && state.aiEnabled) state.stats.aiWins += 1;
+        if (state.rightScore >= WIN_SCORE && !state.aiEnabled) state.stats.rightWins += 1;
         state.paused = true;
         updateOverlay(`${state.winner} wins!`);
+        persistState();
         return;
       }
 
@@ -441,9 +487,10 @@
       ctx.font = '600 18px Inter, sans-serif';
       ctx.textAlign = 'center';
       ctx.fillStyle = 'rgba(148, 163, 184, 0.95)';
-      const mode = state.aiEnabled ? 'Mode: Solo vs Computer' : 'Mode: Two Player';
+      const mode = `Mode: ${currentModeLabel()}`;
       const pause = state.paused && !state.winner ? ' • Paused' : '';
-      ctx.fillText(`${mode}${pause}`, canvas.width / 2, canvas.height - 20);
+      const opponentWins = state.aiEnabled ? state.stats.aiWins : state.stats.rightWins;
+      ctx.fillText(`${mode}${pause} • Matches ${state.stats.matchesPlayed} • L ${state.stats.leftWins} • R ${opponentWins}`, canvas.width / 2, canvas.height - 20);
       ctx.restore();
     }
 
@@ -479,7 +526,8 @@
       if (state.winner) {
         overlay.innerHTML = overlayMarkup(message || `${state.winner} wins!`, [
           `Press <span class="kbd">Space</span> to restart a fresh match.`,
-          `Press <span class="kbd">A</span> to switch between solo and two-player.`
+          `Press <span class="kbd">A</span> to switch between solo and two-player.`,
+          `Saved stats: ${state.stats.matchesPlayed} matches completed in this browser.`
         ]);
         return;
       }
@@ -488,7 +536,8 @@
         overlay.innerHTML = overlayMarkup(message || 'Press Space to start', [
           `Left paddle: <span class="kbd">W</span> / <span class="kbd">S</span>`,
           `Right paddle: <span class="kbd">↑</span> / <span class="kbd">↓</span>`,
-          `Press <span class="kbd">A</span> to ${state.aiEnabled ? 'turn off' : 'turn on'} AI opponent.`
+          `Press <span class="kbd">A</span> to ${state.aiEnabled ? 'turn off' : 'turn on'} AI opponent.`,
+          `Scores and stats are restored from local browser storage.`
         ]);
         return;
       }
@@ -520,6 +569,7 @@
         if (!state.winner) {
           state.paused = !state.paused;
           updateOverlay(state.paused ? 'Paused' : '');
+          persistState();
         }
       }
 
@@ -530,6 +580,7 @@
         window.setTimeout(() => {
           if (state.paused && !state.winner) updateOverlay('Press Space to serve');
         }, 350);
+        persistState();
       }
     });
 
@@ -537,6 +588,7 @@
       state.keys[event.key] = false;
     });
 
+    loadPersistedState();
     resetPaddles();
     updateOverlay();
     draw();
